@@ -1,0 +1,251 @@
+#!/usr/bin/env python
+import os, sys, errno
+import urllib2, re, subprocess, random
+from subprocess import check_output
+import StringIO, struct, ReseekFile
+import ctypes
+import platform
+
+outdir = '/tmp/nginx/images'
+wwwpath = 'http://localhost/images'
+
+
+# Width/height ratio of our source image
+WIDTH_HEIGHT_RATIO = 0.631726983
+
+# Min area of images to replace
+MIN_IMAGE_AREA = 2000
+
+# Regexp for guesstimating that a url points to an image
+IMG_REGEX = re.compile('/static/|/thumb/|/thumbnail/|/thumbnails/|/images/|/image/|/img/|\.jpg|\.jpeg')
+
+# Stop creating new images if the amount of free space on this volume is
+# less than this threshold (Mb)
+MIN_FREE_SPACE = 200
+
+
+def cleanup(inputUrl=None):
+	try:
+		if not inputUrl == None:
+			sys.stdout.write(inputUrl + "\n")
+			sys.stdout.flush()
+	except IOError:
+		pass
+	sys.exit(0)
+
+
+def imageStampDirection(width, height):
+	horScaledWidth = int(height * WIDTH_HEIGHT_RATIO)
+	horNbrStamps = int(width / horScaledWidth)
+	horDeadSpace = int(width % horScaledWidth)
+
+	verScaledHeight = int(width / WIDTH_HEIGHT_RATIO)
+	verNbrStamps = int(height / verScaledHeight)
+	verDeadSpace = int(height % verScaledHeight)
+
+	if (horNbrStamps > verNbrStamps):
+		return (True, horNbrStamps, horScaledWidth, height, horDeadSpace)
+	elif (horNbrStamps < verNbrStamps):
+		return (False, verNbrStamps, width, verScaledHeight, verDeadSpace)
+
+	# If both alignments would use as many stamps
+	if (horDeadSpace < verDeadSpace):
+		return (True, horNbrStamps, horScaledWidth, height, horDeadSpace)
+	else:
+		return (False, verNbrStamps, width, verScaledHeight, verDeadSpace)
+
+
+def createHorizontal(width, height, nbrStamps, stampWidth, stampHeight, deadSpace):
+	outname = '%dx%d.png' % (width, height)
+	outpath = os.path.join(outdir, outname)
+
+	if (nbrStamps < 1):
+		errorMsg = "createHorizontal():\t" + str(width) + "x" + str(height) + "  ->  nbrSubImages= " + str(nbrSubImages) + "\n\t\t\t\t\tstampWidth: " + str(stampWidth) + "   deadSpace: " + str(deadSpace)
+		raise AssertionError(errorMsg)
+
+	buildCmd = "convert -size " + str(width) + "x" + str(height) + " xc:none"
+	for nbr in range(0, nbrStamps):
+		buildCmd += " -draw \"image over " + str(int(nbr*stampWidth + deadSpace/2)) + ",0 " + str(stampWidth) + "," + str(height) + " '/opt/obey.svg'\""
+	buildCmd += " " + outpath
+
+	subprocess.call(["sh", "-c"] + [buildCmd])
+	return '/'.join([wwwpath, outname])
+
+
+def createVertical(width, height, nbrStamps, stampWidth, stampHeight, deadSpace):
+	outname = '%dx%d.png' % (width, height)
+	outpath = os.path.join(outdir, outname)
+
+	if (nbrStamps < 1):
+		errorMsg = "createVertical():\t" + str(width) + "x" + str(height) + "  ->  nbrSubImages= " + str(nbrStamps) + "\n\t\t\t\t\tstampHeight: " + str(stampHeight) + "   deadSpace: " + str(deadSpace)
+		raise AssertionError(errorMsg)
+
+	buildCmd = "convert -size " + str(width) + "x" + str(height) + " xc:none"
+	for nbr in range(0, nbrStamps):
+		buildCmd += " -draw \"image over 0," + str(int(nbr*stampHeight + deadSpace/2)) + " " + str(width) + "," + str(stampHeight) + " '/opt/obey.svg'\""
+	buildCmd += " " + outpath
+
+	subprocess.call(["sh", "-c"] + [buildCmd])
+	return '/'.join([wwwpath, outname])
+
+
+def getImageInfo(datastream):
+	datastream = ReseekFile.ReseekFile(datastream)
+	data = str(datastream.read(30))
+	size = len(data)
+	height = -1
+	width = -1
+	content_type = None
+
+	# handle GIFs
+	if (size >= 10) and data[:6] in ('GIF87a', 'GIF89a'):
+		# Check to see if content_type is correct
+		content_type = 'image/gif'
+		w, h = struct.unpack("<HH", data[6:10])
+		width = int(w)
+		height = int(h)
+
+	# See PNG 2. Edition spec (http://www.w3.org/TR/PNG/)
+	# Bytes 0-7 are below, 4-byte chunk length, then 'IHDR'
+	# and finally the 4-byte width, height
+	elif ((size >= 24) and data.startswith('\211PNG\r\n\032\n') and (data[12:16] == 'IHDR')):
+		content_type = 'image/png'
+		w, h = struct.unpack(">LL", data[16:24])
+		width = int(w)
+		height = int(h)
+
+	# Maybe this is for an older PNG version.
+	elif (size >= 16) and data.startswith('\211PNG\r\n\032\n'):
+		# Check to see if we have the right content type
+		content_type = 'image/png'
+		w, h = struct.unpack(">LL", data[8:16])
+		width = int(w)
+		height = int(h)
+
+	# handle JPEGs
+	elif (size >= 2) and data.startswith('\377\330'):
+		content_type = 'image/jpeg'
+		datastream.seek(0)
+		datastream.read(2)
+		b = datastream.read(1)
+		try:
+			while (b and ord(b) != 0xDA):
+				while (ord(b) != 0xFF): b = datastream.read(1)
+				while (ord(b) == 0xFF): b = datastream.read(1)
+				if (ord(b) >= 0xC0 and ord(b) <= 0xC3):
+					datastream.read(3)
+					h, w = struct.unpack(">HH", datastream.read(4))
+					break
+				else:
+					datastream.read(int(struct.unpack(">H", datastream.read(2))[0])-2)
+					b = datastream.read(1)
+			width = int(w)
+			height = int(h)
+		except struct.error:
+			return (None, -1, -1)
+		except ValueError:
+			return (None, -1, -1)
+
+	if w==-1 or h==-1:
+		return None, -1, -1
+		
+	return content_type, width, height
+
+
+def createDir():
+	"""Make sure that the output directory exists"""
+	try:
+		os.makedirs(outdir)
+		os.chmod(outdir, 0777)
+	except OSError as exc:
+		if exc.errno == errno.EEXIST and os.path.isdir(outdir):
+			pass
+		else:
+			sys.exit(0)
+
+
+def isImageUrl(inputUrl):
+	"""Return true and url dscriptor iff the content type is that of an image"""
+	try:
+		urlObj = urllib2.urlopen(inputUrl)
+
+		headers = urlObj.info()
+#		if ("Content-Type" in headers) and ("image/" in headers["Content-Type"]):
+#			return (True, urlObj)
+
+		match = IMG_REGEX.search(inputUrl.lower())
+		if match:
+			return (True, urlObj)
+
+		return (False, None)
+	except IOError:
+		return (False, None)
+	except ValueError:
+		return (False, None)
+
+
+def getFreeSpaceMb(folder):
+	"""Return folder/drive free space (in megabytes)"""
+	if platform.system() == 'Windows':
+		free_bytes = ctypes.c_ulonglong(0)
+		ctypes.windll.kernel32.GetDiskFreeSpaceExW(ctypes.c_wchar_p(folder), None, None, ctypes.pointer(free_bytes))
+		return free_bytes.value/1024/1024
+	else:
+		st = os.statvfs(folder)
+		return st.f_bavail * st.f_frsize/1024/1024
+
+
+def existsInCache(width, height):
+	outname = '%dx%d.png' % (width, height)
+	outpath = os.path.join(outdir, outname)
+	return os.path.isfile(outpath)
+
+
+def createImage(width, height):
+	if existsInCache(width, height):
+		outname = '%dx%d.png' % (width, height)
+		print '/'.join([wwwpath, outname])
+		return
+
+	if (getFreeSpaceMb(outdir) <= MIN_FREE_SPACE):
+		msg = "Less than %sMb free space is available in folder %s" % (MIN_FREE_SPACE, outdir)
+		raise IOError(msg)
+
+	(isHoriz, nbrStamps, stampWidth, stampHeight, deadSpace) = imageStampDirection(width, height)
+	if (isHoriz):
+		print createHorizontal(width, height, nbrStamps, stampWidth, stampHeight, deadSpace)
+	else:
+		print createVertical(width, height, nbrStamps, stampWidth, stampHeight, deadSpace)
+
+
+createDir()
+while True:
+	try:
+		raw = raw_input()
+		l = raw.split(' ')
+		url = l[0]
+		(isImage, urlObj) = isImageUrl(url)
+		if isImage == False:
+			print url
+			sys.stdout.flush()
+			continue
+
+		(contentType, width, height) = getImageInfo(urlObj)
+		if (contentType == None):
+			print url
+			sys.stdout.flush()
+			continue
+
+		if  ((width * height) >= MIN_IMAGE_AREA):
+			createImage(width, height)
+		else:
+			print url
+		sys.stdout.flush()
+	except EOFError:
+		cleanup()
+	except IOError:
+		cleanup()
+	except AssertionError as e:
+		errorMsg = "Error while creating image for: \t%s\nAssertionError: %s" % (url, e)
+		raise AssertionError(errorMsg)
+cleanup()

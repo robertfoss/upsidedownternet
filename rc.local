@@ -1,0 +1,16 @@
+#!/bin/sh -e
+
+#ifdown wlan1
+#ifup wlan1
+
+echo "1" > /proc/sys/net/ipv4/ip_dynaddr
+echo "1" > /proc/sys/net/ipv4/ip_forward
+
+udhcpd /opt/udhcpd.conf
+hostapd -dd -B /opt/hostapd.conf
+iptables-restore < /opt/iptables.rules
+squid3 -f /opt/squid.conf
+/etc/init.d/nginx start
+
+
+exit 0
