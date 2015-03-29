@@ -1,7 +1,7 @@
 # upsidedownternet
 A dockerized wifi access point with upsidedownternet functionality
 
-# SUpported hosts
+# Supported hosts
  * Ubuntu with network manager
  * Linux distros with unmanaged network
 
