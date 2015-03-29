@@ -17,7 +17,7 @@ WIDTH_HEIGHT_RATIO = 0.631726983
 MIN_IMAGE_AREA = 2000
 
 # Regexp for guesstimating that a url points to an image
-IMG_REGEX = re.compile('/static/|/thumb/|/thumbnail/|/thumbnails/|/images/|/image/|/img/|\.jpg|\.jpeg')
+IMG_REGEX = re.compile('/static/|/thumb/|/thumbnail/|/thumbnails/|/images/|/image/|/img/|\.jpg|\.jpeg|\.png|\.gif')
 
 # Stop creating new images if the amount of free space on this volume is
 # less than this threshold (Mb)
