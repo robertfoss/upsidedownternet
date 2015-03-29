@@ -152,18 +152,6 @@ def getImageInfo(datastream):
 	return content_type, width, height
 
 
-def createDir():
-	"""Make sure that the output directory exists"""
-	try:
-		os.makedirs(outdir)
-		os.chmod(outdir, 0777)
-	except OSError as exc:
-		if exc.errno == errno.EEXIST and os.path.isdir(outdir):
-			pass
-		else:
-			sys.exit(0)
-
-
 def isImageUrl(inputUrl):
 	"""Return true and url dscriptor iff the content type is that of an image"""
 	try:
@@ -214,7 +202,6 @@ def createImage(width, height):
 		print createVertical(width, height, nbrStamps, stampWidth, stampHeight, deadSpace)
 
 
-createDir()
 while True:
 	try:
 		raw = raw_input()
