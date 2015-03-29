@@ -1,7 +1,7 @@
 #!/bin/sh -e
 
-#ifdown wlan1
-#ifup wlan1
+ifdown wlan1
+ifup wlan1
 
 echo "1" > /proc/sys/net/ipv4/ip_dynaddr
 echo "1" > /proc/sys/net/ipv4/ip_forward

@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python2.7
 import os, sys, errno
 import urllib2, re, subprocess, random
 from subprocess import check_output
@@ -168,11 +168,7 @@ def isImageUrl(inputUrl):
 	"""Return true and url dscriptor iff the content type is that of an image"""
 	try:
 		urlObj = urllib2.urlopen(inputUrl)
-
 		headers = urlObj.info()
-#		if ("Content-Type" in headers) and ("image/" in headers["Content-Type"]):
-#			return (True, urlObj)
-
 		match = IMG_REGEX.search(inputUrl.lower())
 		if match:
 			return (True, urlObj)

@@ -19,6 +19,13 @@ RUN \
     iptables         \
     imagemagick
 
+# Set up user groups
+RUN usermod -aG www-data proxy
+RUN usermod -aG proxy www-data
+RUN mkdir -p /tmp/nginx/images
+RUN chown -R www-data:www-data /tmp/nginx/images
+RUN chmod 775 -R /tmp/nginx/images
+
 # Copy configuration files
 ADD rc.local        /etc/rc.local
 ADD interfaces      /etc/network/interfaces
@@ -30,9 +37,6 @@ ADD squid.conf      /opt/squid.conf
 ADD replace_images  /opt/replace_images
 ADD ReseekFile.py   /opt/ReseekFile.py
 ADD obey.svg        /opt/obey.svg
-
-# Set up environment
-RUN mkdir -p /tmp/nginx/images
 
 # Run on exec
 #CMD ["/etc/rc.local"]
