@@ -6,11 +6,11 @@ ifup wlan1
 echo "1" > /proc/sys/net/ipv4/ip_dynaddr
 echo "1" > /proc/sys/net/ipv4/ip_forward
 
-udhcpd /opt/udhcpd.conf
-hostapd -dd -B /opt/hostapd.conf
 iptables-restore < /opt/iptables.rules
-squid3 -f /opt/squid.conf
+udhcpd /opt/udhcpd.conf
+hostapd -B /opt/hostapd.conf
 /etc/init.d/nginx start
+squid3 -f /opt/squid.conf
 
 
 exit 0
