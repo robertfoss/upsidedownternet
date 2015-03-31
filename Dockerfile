@@ -27,7 +27,8 @@ RUN chown -R www-data:www-data /tmp/nginx/images
 RUN chmod 775 -R /tmp/nginx/images
 
 # Copy configuration files
-ADD rc.local        /etc/rc.local
+ADD start.sh        /opt/start.sh
+ADD run.sh          /opt/run.sh
 ADD interfaces      /etc/network/interfaces
 ADD hostapd.conf    /opt/hostapd.conf
 ADD iptables.rules  /opt/iptables.rules
@@ -39,4 +40,4 @@ ADD ReseekFile.py   /opt/ReseekFile.py
 ADD obey.svg        /opt/obey.svg
 
 # Run on exec
-#CMD ["/etc/rc.local"]
+CMD ["/opt/start.sh"]
