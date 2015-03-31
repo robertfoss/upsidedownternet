@@ -9,4 +9,5 @@ These restrictions are based around the fact that hostapd running in the docker 
 
 # Run
 wlan1 = your access point capable wifi-interface of choice
+
     sudo ./upsidedownternet.sh wlan1
