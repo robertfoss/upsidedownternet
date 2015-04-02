@@ -7,20 +7,18 @@ AP_INTERFACE_MAC=$(cat "/sys/class/net/$AP_INTERFACE/address")
 docker build -t upsidedownternet .
 
 # Remove interface from network manager control
-if test -f "/etc/init.d/network-manager"; then
-    if test -f "/etc/NetworkManager/NetworkManager.conf"; then
-        /etc/init.d/network-manager stop > /dev/null 2>&1
-        killall wpa_supplicant > /dev/null 2>&1
-        
-        # Prevent wpa_supplicant from grabbing out interface
-        grep "\[keyfile\]" /etc/NetworkManager/NetworkManager.conf || \
-        (
-            (echo "" >> /etc/NetworkManager/NetworkManager.conf) > /dev/null 2>&1
-            (echo "[keyfile]" >> /etc/NetworkManager/NetworkManager.conf) > /dev/null 2>&1
-            (echo "unmanaged-devices=mac:$AP_INTERFACE_MAC" >> /etc/NetworkManager/NetworkManager.conf) > /dev/null 2>&1
-        );
-        /etc/init.d/network-manager start > /dev/null 2>&1
-    fi
+if test -f "/etc/NetworkManager/NetworkManager.conf"; then
+    /etc/init.d/network-manager stop > /dev/null 2>&1
+    killall wpa_supplicant > /dev/null 2>&1
+    
+    # Prevent wpa_supplicant from grabbing out interface
+    grep "\[keyfile\]" /etc/NetworkManager/NetworkManager.conf || \
+    (
+        (echo "" >> /etc/NetworkManager/NetworkManager.conf) > /dev/null 2>&1
+        (echo "[keyfile]" >> /etc/NetworkManager/NetworkManager.conf) > /dev/null 2>&1
+        (echo "unmanaged-devices=mac:$AP_INTERFACE_MAC" >> /etc/NetworkManager/NetworkManager.conf) > /dev/null 2>&1
+    );
+    /etc/init.d/network-manager start > /dev/null 2>&1
 fi
 ifdown $AP_INTERFACE > /dev/null 2>&1
 ip addr flush dev $AP_INTERFACE > /dev/null 2>&1
