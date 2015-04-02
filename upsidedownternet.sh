@@ -12,9 +12,6 @@ if test -f "/etc/init.d/network-manager"; then
         /etc/init.d/network-manager stop > /dev/null 2>&1
         killall wpa_supplicant > /dev/null 2>&1
         
-        # Prevent network manager from managing interface
-        (grep "iface $AP_INTERFACE inet manual" /etc/network/interfaces || echo "iface $AP_INTERFACE inet manual" >> /etc/network/interfaces) > /dev/null 2>&1
-        
         # Prevent wpa_supplicant from grabbing out interface
         grep "\[keyfile\]" /etc/NetworkManager/NetworkManager.conf || \
         (
